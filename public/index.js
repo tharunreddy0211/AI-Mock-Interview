@@ -7,6 +7,7 @@ let recordedBlob = null;
 let currentSubject = null;
 let isSpeaking = false;
 let currentAudio = null;
+let currentSessionId = null;
 
 // DOM Elements
 const welcomeState = document.getElementById("welcomeState");
@@ -121,6 +122,7 @@ function displayFeedback(data) {
 
 function resetToWelcome() {
     currentSubject = null;
+    currentSessionId = null;
     isSpeaking = false;
     mediaRecorder = null;
     recordingChunks = [];
@@ -293,23 +295,24 @@ function stopRecording() {
 
 // ========== API FUNCTIONS ==========
 
-const startInterviewApiUrl = "http://127.0.0.1:5000/start-interview";
+const startInterviewApiUrl = "/api/start-interview";
 
 
 async function startInterview() {
     startInterviewBtn.classList.add("hidden");
     recordBtn.classList.remove("hidden");
     recordingStatus.textContent = "Connecting...";
-    
+
     try {
         const response = await fetch(startInterviewApiUrl, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ subject: currentSubject })
         });
-        
+
         const contentType = response.headers.get("content-type");
-        
+        currentSessionId = response.headers.get("X-Session-Id") || currentSessionId;
+
         if (contentType && contentType.includes("text/plain")) {
             handleAudioStream(response, () => {
                 endInterviewBtn.disabled = false;
@@ -328,7 +331,7 @@ async function startInterview() {
     }
 }
 
-const submitAnswerApiUrl = "http://127.0.0.1:5000/submit-answer";
+const submitAnswerApiUrl = "/api/submit-answer";
 
 
 async function submitAnswer() {
@@ -339,6 +342,7 @@ async function submitAnswer() {
 
     const formData = new FormData();
     formData.append("audio", recordedBlob, "answer.webm");
+    formData.append("sessionId", currentSessionId);
 
     try {
         const response = await fetch(submitAnswerApiUrl, {
@@ -401,7 +405,7 @@ async function endInterview() {
     await getFeedback();
 }
 
-const getFeedbackApiUrl = "http://127.0.0.1:5000/get-feedback";
+const getFeedbackApiUrl = "/api/get-feedback";
 
 async function getFeedback() {
     showFeedbackSection();
@@ -412,7 +416,7 @@ async function getFeedback() {
         const response = await fetch(getFeedbackApiUrl, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({})
+            body: JSON.stringify({ sessionId: currentSessionId })
         });
         
         const data = await response.json();
